@@ -1,0 +1,4 @@
+__pycache__/
+markdown/
+online_results/
+test_rag.py

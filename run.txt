@@ -1,0 +1,5 @@
+baseline:
+xvfb-run -a python seeact.py -c config/auto_mode.toml
+
+desc_rag:
+xvfb-run -a python seeact_desc.py -c config/auto_mode_rag.toml

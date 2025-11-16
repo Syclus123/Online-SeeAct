@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 # Copyright (c) 2024 OSU Natural Language Processing Group
 #
@@ -58,6 +57,91 @@ class SessionControl:
 
 
 session_control = SessionControl()
+
+
+def load_task_description_reference(task_name: str, descriptions_path: str = None) -> str:
+    """
+    Load task description reference for RAG-enhanced prompting
+    Similar to PlanningPromptDescriptionRetrievalConstructor
+    
+    Args:
+        task_name: The task name to search for
+        descriptions_path: Path to the generated_task_descriptions.json file
+        
+    Returns:
+        Formatted reference string
+    """
+    if descriptions_path is None:
+        descriptions_path = "data/Online-Mind2Web/generated_steps/generated_task_descriptions.json"
+    
+    try:
+        if not os.path.exists(descriptions_path):
+            print(f"⚠️  Task descriptions file not found: {descriptions_path}")
+            return ""
+        
+        with open(descriptions_path, 'r', encoding='utf-8') as f:
+            generated_descriptions = json.load(f)
+        
+        print(f"\n🔍 Looking for task description matching: {task_name}")
+        
+        # Find matching task description (exact match first)
+        task_description = None
+        for desc in generated_descriptions:
+            if desc['task_name'].lower() == task_name.lower():
+                task_description = desc
+                break
+        
+        # Try partial match if exact match fails
+        if not task_description:
+            for desc in generated_descriptions:
+                if task_name.lower() in desc['task_name'].lower() or desc['task_name'].lower() in task_name.lower():
+                    task_description = desc
+                    print(f"📝 Found partial match: {desc['task_name']}")
+                    break
+        
+        if not task_description:
+            print(f"⚠️  No matching task description found for: {task_name}")
+            return ""
+        
+        print(f"✅ Found matching task description: {task_description['task_name']}")
+        
+        # Build formatted reference
+        reference = "\n\n## Similar Task Example ##\n"
+        reference += f"**Example Task:** {task_description['task_name']}\n"
+        reference += f"**Website:** {task_description.get('website', 'N/A')}\n"
+        reference += f"**Task Level:** {task_description.get('level', 'N/A')}\n\n"
+        reference += "**Step-by-step Example:**\n"
+        
+        # Add each step's detailed description
+        for step in task_description['steps']:
+            reference += f"\n**Step {step['step_number']}:**\n"
+            reference += f"- **Observation:** {step['observation_description']}\n"
+            reference += f"- **Action:** {step['action_description']}\n"
+            
+            # Include original action information if available
+            if 'original_action' in step:
+                original_action = step['original_action']
+                reference += f"- **Operation Type:** {original_action.get('operation', 'N/A')}\n"
+                if original_action.get('value'):
+                    reference += f"- **Value:** {original_action['value']}\n"
+            
+            reference += "\n"
+        
+        # Add learning points
+        reference += "\n**Learning Points:**\n"
+        reference += "- Follow the logical sequence of actions and understand the intent behind each step\n"
+        reference += "- Observe how the agent interprets visual or textual cues to decide actions\n"
+        reference += "- Pay attention to how UI elements are located and interacted with\n"
+        reference += "- Learn to generalize and apply similar action-observation patterns\n"
+        reference += "- Use the example to guide your decision-making process\n\n"
+        
+        return reference
+        
+    except Exception as e:
+        print(f"❌ Error loading task description: {e}")
+        import traceback
+        print(f"Error details: {traceback.format_exc()}")
+        return ""
 
 
 #
@@ -139,6 +223,13 @@ async def main(config, base_dir) -> None:
     save_file_dir = os.path.abspath(save_file_dir)
     default_task = config["basic"]["default_task"]
     default_website = config["basic"]["default_website"]
+    
+    # RAG settings
+    enable_rag = config["basic"].get("enable_rag", False)
+    rag_descriptions_path = config["basic"].get("rag_descriptions_path", 
+                                                 "/home/ubuntu/data/csb/Online-SeeAct/data/generate_steps/generated_task_descriptions.json")
+    if not os.path.isabs(rag_descriptions_path):
+        rag_descriptions_path = os.path.join(base_dir, rag_descriptions_path)
 
     # Experiment settings
     task_file_path = os.path.join(base_dir, config["experiment"]["task_file_path"]) if not os.path.isabs(
@@ -276,6 +367,16 @@ async def main(config, base_dir) -> None:
             time_step = 0
             no_op_count = 0
             valid_op_count = 0
+            
+            # Load RAG reference once at the beginning if enabled
+            task_reference = ""
+            if enable_rag:
+                logger.info("🔍 Loading RAG reference for task...")
+                task_reference = load_task_description_reference(confirmed_task, rag_descriptions_path)
+                if task_reference:
+                    logger.info("✅ RAG reference loaded successfully")
+                else:
+                    logger.info("⚠️  No RAG reference found for this task")
 
             while not complete_flag:
                 if dev_mode:
@@ -457,6 +558,13 @@ async def main(config, base_dir) -> None:
                     # Format prompts for LLM inference
                     prompt = generate_prompt(task=confirmed_task, previous=taken_actions, choices=choices,
                                              experiment_split="SeeAct")
+                    
+                    # Add RAG reference to the user prompt if available
+                    if enable_rag and task_reference and len(prompt) >= 2:
+                        # Insert reference after the task description but before the choices
+                        # prompt[1] is the user prompt that contains task and previous actions
+                        prompt[1] = prompt[1] + task_reference
+                    
                     if dev_mode:
                         for prompt_i in prompt:
                             logger.info(prompt_i)

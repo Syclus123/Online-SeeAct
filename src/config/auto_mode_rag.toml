@@ -1,18 +1,22 @@
 [basic]
 is_demo = false # Set to true for demo mode, prompting user input for tasks and URLs. False reads tasks from a JSON file.
-save_file_dir = "../online_results/baseline_1113_30" # Directory to save the results of the program's operations.
+save_file_dir = "../online_results/desc_rag" # Directory to save the results of the program's operations.
 default_task ="Find pdf of paper \"GPT-4V(ision) is a Generalist Web Agent, if Grounded\" from arXiv" # Default task to perform.
 default_website = "https://www.google.com/" # Default website to start the task.
 
+# RAG settings - NEW
+enable_rag = true # Enable RAG-enhanced prompting with similar task examples
+rag_descriptions_path = "/home/ubuntu/data/csb/Online-SeeAct/data/generate_steps/generated_task_descriptions.json" # Path to task descriptions for RAG
+
 [experiment]
-task_file_path = "../data/online_tasks/101_16_30.json" # Path to the JSON file with tasks (ignored if is_demo is true).
+task_file_path = "../data/online_tasks/101.json" # Path to the JSON file with tasks (ignored if is_demo is true).
 overwrite = false # Enable to overwrite existing results. Disable to skip tasks already saved in save_file_dir.
 top_k = 50  # Number of top element candidates to consider if a ranker is used.
 fixed_choice_batch_size = 17 # Fixed number of options for each multiple-choice question.
 # Ensure a manageable number to prevent Playwright crashes during screenshot capture due to large image sizes.
 dynamic_choice_batch_size=1600 # Dynamic batch size based on webpage height. Overrides fixed_choice_batch_size if positive.
 max_continuous_no_op = 2 # Maximum number of consecutive ineffective operations allowed.
-max_op = 30 # Maximum number of operations to attempt.
+max_op = 50 # Maximum number of operations to attempt.
 highlight = false # If true, highlights elements during processing. Included in screenshots.
 monitor = false # Monitors each step. Pausing after each operation for safety, recommended to be always true. You should always monitor agents' behavior even if is set as false.
 dev_mode=false # Developer mode toggle.
